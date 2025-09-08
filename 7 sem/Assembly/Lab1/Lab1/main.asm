@@ -109,20 +109,37 @@ MAIN PROC
     MOV  ESI,OFFSET BUF       ; указатель на строку
     XOR  EAX,EAX              ; число = 0
     XOR  EBX,EBX              ; EBX будем использовать для цифры
+    XOR EBP,EBP               ; EBP = 0 -> знак '+', 1 -> '-'
+    ;XOR  EDX,EDX
+
+    CMP  BYTE PTR [ESI], '-'           ; символ -> BL
+    JNE CONVERT_OCT
+    MOV  EBP, 1               ; отметили минус
+    INC  ESI                  ; пропускаем '-'
+    DEC  ECX                  ; уменьшаем длину
+
+
 CONVERT_OCT:
-    MOV  BL,[ESI]             ; символ -> BL
+    MOV  BL,[ESI] 
     CMP  BL,'0'
-    JB   BAD_INPUT             ; если < '0' → ошибка
+    JB   BAD_INPUT             ; если < '0' ? ошибка
     CMP  BL,'7'
-    JA   BAD_INPUT             ; если > '7' → ошибка
+    JA   BAD_INPUT             ; если > '7' ? ошибка
     SUB  BL,'0'               ; преобразуем символ в цифру
-    MUL  EDI                  ; EAX = EAX * 8
+    SHL EAX, 3                  ; EAX = EAX * 8
     ADD  EAX,EBX              ; EAX += цифра
-NEXT_OCT:
     INC  ESI                  ; следующий символ
-    LOOP CONVERT_OCT           ; повторяем ECX раз
-    MOV  X_DEC,EAX            ; сохранили десятичное число
+    LOOP CONVERT_OCT           ; повторяем ECX раз  
+NEXT_OCT:   
+    
+    CMP EBP, 0
+    JE CONVERT_OK
+    XOR  EDX, EDX             ; EDX = 0
+    SUB  EDX, EAX             ; EDX = 0 - EAX
+    MOV  EAX, EDX             ; EAX = -EAX
     JMP  CONVERT_OK
+
+
 
 ; обработка ошибки 
 BAD_INPUT:
@@ -141,6 +158,8 @@ BAD_INPUT:
     CALL ExitProcess@4
 
 CONVERT_OK:
+    MOV  X_DEC,EAX            ; сохранили десятичное число
+    
 
 
 ; выход
