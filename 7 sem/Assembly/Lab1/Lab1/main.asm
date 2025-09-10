@@ -110,9 +110,8 @@ MAIN PROC
     XOR  EAX,EAX              ; число = 0
     XOR  EBX,EBX              ; EBX будем использовать для цифры
     XOR EBP,EBP               ; EBP = 0 -> знак '+', 1 -> '-'
-    ;XOR  EDX,EDX
 
-    CMP  BYTE PTR [ESI], '-'           ; символ -> BL
+    CMP  BYTE PTR [ESI], '-'  ; символ -> BL
     JNE CONVERT_OCT
     MOV  EBP, 1               ; отметили минус
     INC  ESI                  ; пропускаем '-'
@@ -122,14 +121,14 @@ MAIN PROC
 CONVERT_OCT:
     MOV  BL,[ESI] 
     CMP  BL,'0'
-    JB   BAD_INPUT             ; если < '0' ? ошибка
+    JB   BAD_INPUT            ; если < '0' ? ошибка
     CMP  BL,'7'
-    JA   BAD_INPUT             ; если > '7' ? ошибка
+    JA   BAD_INPUT            ; если > '7' ? ошибка
     SUB  BL,'0'               ; преобразуем символ в цифру
-    SHL EAX, 3                  ; EAX = EAX * 8
+    SHL EAX, 3                ; EAX = EAX * 8
     ADD  EAX,EBX              ; EAX += цифра
     INC  ESI                  ; следующий символ
-    LOOP CONVERT_OCT           ; повторяем ECX раз  
+    LOOP CONVERT_OCT          ; повторяем ECX раз  
 NEXT_OCT:   
     
     CMP EBP, 0
@@ -153,15 +152,82 @@ BAD_INPUT:
     PUSH DOUT
     CALL WriteConsoleA@20
 
-    ; сразу завершаем программу
+    ; завершаем программу
     PUSH 0
     CALL ExitProcess@4
 
 CONVERT_OK:
     MOV  X_DEC,EAX            ; сохранили десятичное число
     
+; подпись "Число в десятичной системе: "
+    PUSH OFFSET STR_DEC
+    CALL lstrlenA@4
+    PUSH 0
+    PUSH OFFSET LENS
+    PUSH EAX
+    PUSH OFFSET STR_DEC
+    PUSH DOUT
+    CALL WriteConsoleA@20
 
+    ;  конвертация EAX -> десятичная строка со знаком 
+    MOV  EAX, X_DEC            ; число для печати (signed)
+    XOR  EBP, EBP              ; EBP=0 -> '+', 1 -> '-'
+    JGE  dec_abs_ready
+    MOV  EBP, 1                ; отрицательное
+    XOR  EDX, EDX
+    SUB  EDX, EAX              ; |EAX| = 0 - EAX   (без NEG)
+    MOV  EAX, EDX
+dec_abs_ready:
 
+    LEA  ESI, OUTBUF[63]       ; будем писать с конца буфера
+    XOR  ECX, ECX              ; длина строки = 0
+    MOV  EBX, 10
+
+    ; частный случай: ноль
+    CMP  EAX, 0
+    JNE  dec_loop
+    DEC  ESI
+    MOV  BYTE PTR [ESI], '0'
+    INC  ECX
+    JMP  dec_sign
+
+dec_loop:
+    ; EAX > 0: вытаскиваем цифры в обратном порядке
+    XOR  EDX, EDX
+    DIV  EBX                   ; EAX = EAX/10, EDX = остаток
+    ADD  DL, '0'
+    DEC  ESI
+    MOV  [ESI], DL
+    INC  ECX
+    TEST EAX, EAX
+    JNZ  dec_loop
+
+dec_sign:
+    TEST EBP, EBP
+    JZ   dec_print
+    DEC  ESI
+    MOV  BYTE PTR [ESI], '-'
+    INC  ECX
+
+dec_print:
+    ; Печатаем ECX байт начиная с ESI
+    PUSH 0
+    PUSH OFFSET LENS           ; сюда вернётся кол-во выведенных символов
+    PUSH ECX                   ; длина
+    PUSH ESI                   ; адрес начала строки
+    PUSH DOUT
+    CALL WriteConsoleA@20
+    
+    ; перевод строки
+    PUSH OFFSET STR_NL
+    CALL lstrlenA@4
+    PUSH 0
+    PUSH OFFSET LENS
+    PUSH EAX
+    PUSH OFFSET STR_NL
+    PUSH DOUT
+    CALL WriteConsoleA@20
+       
 ; выход
 PUSH 0
 CALL ExitProcess@4
