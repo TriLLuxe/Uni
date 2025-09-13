@@ -17,7 +17,7 @@ EXTERN lstrlenA@4: PROC
 .DATA
 ;  сообщения 
 STR_INVITE   DB "Введите число в восьмеричной системе: ",0
-STR_DEC      DB 13,10,"Число в десятичной системе: ",0
+STR_DEC      DB "Число в десятичной системе: ",0
 STR_FHEX     DB "F(x)=3*x^2-12*x+3 в шестнадцатеричной системе: ",0
 STR_FDEC     DB "F(x)=3*x^2-12*x+3 в десятичной системе: ",0
 STR_NL       DB 13,10,0
@@ -40,6 +40,10 @@ F_VAL     DD ?              ; значение полинома
 Acoef     DD 3
 Bcoef     DD -12
 Ccoef     DD 3
+
+X_SQR   DD ?      ; x^2
+AX2     DD ?      ; a*x^2
+BX1      DD ?      ; b*x
 
 .CODE
 MAIN PROC
@@ -172,6 +176,7 @@ CONVERT_OK:
     ;  конвертация EAX -> десятичная строка со знаком 
     MOV  EAX, X_DEC            ; число для печати (signed)
     XOR  EBP, EBP              ; EBP=0 -> '+', 1 -> '-'
+    CMP EAX, 0
     JGE  dec_abs_ready
     MOV  EBP, 1                ; отрицательное
     XOR  EDX, EDX
@@ -199,11 +204,11 @@ dec_loop:
     DEC  ESI
     MOV  [ESI], DL
     INC  ECX
-    TEST EAX, EAX
+    CMP EAX, 0
     JNZ  dec_loop
 
 dec_sign:
-    TEST EBP, EBP
+    CMP EBP, 0
     JZ   dec_print
     DEC  ESI
     MOV  BYTE PTR [ESI], '-'
@@ -227,7 +232,169 @@ dec_print:
     PUSH OFFSET STR_NL
     PUSH DOUT
     CALL WriteConsoleA@20
-       
+
+; ===================== ВЫЧИСЛЕНИЕ F(x) =====================
+    ; x^2
+    MOV   EAX, X_DEC
+    IMUL  EAX, EAX            ; EAX = x*x
+    MOV   X_SQR, EAX
+
+    ; a*x^2
+    MOV   EAX, X_SQR
+    IMUL  EAX, Acoef          ; EAX = a*x^2
+    MOV   AX2, EAX
+
+    ; b*x
+    MOV   EAX, X_DEC
+    IMUL  EAX, Bcoef          ; EAX = b*x
+    MOV   BX1, EAX
+
+    ; F = a*x^2 + b*x + c
+    MOV   EAX, AX2
+    ADD   EAX, BX1
+    ADD   EAX, Ccoef
+    MOV   F_VAL, EAX
+; ===========================================================
+  
+  
+; ---- подпись для HEX ----
+    PUSH OFFSET STR_FHEX
+    CALL lstrlenA@4
+    PUSH 0
+    PUSH OFFSET LENS
+    PUSH EAX
+    PUSH OFFSET STR_FHEX
+    PUSH DOUT
+    CALL WriteConsoleA@20
+
+; ---- конвертация F_VAL -> HEX ----
+    MOV  EAX, F_VAL           ; число для печати 
+    XOR  EBP, EBP             ; 0 = '+', 1 = '-'
+    CMP EAX, 0
+    JGE  f_hex_abs_ready
+    MOV  EBP, 1               ; отрицательное
+    XOR  EDX, EDX
+    SUB  EDX, EAX             ; |EAX| = 0 - EAX
+    MOV  EAX, EDX
+f_hex_abs_ready:
+
+    LEA  ESI, OUTBUF[63]      ; будем писать с конца буфера
+    XOR  ECX, ECX             ; длина строки = 0
+    MOV  EBX, 16
+
+    ; частный случай: ноль
+    CMP  EAX, 0
+    JNE  f_hex_loop
+    DEC  ESI
+    MOV  BYTE PTR [ESI], '0'
+    INC  ECX
+    JMP  f_hex_sign
+
+f_hex_loop:
+    XOR  EDX, EDX
+    DIV  EBX                  ; EAX = EAX / 16, EDX = остаток 0..15
+    MOV  DL, [DIGITS+EDX]     ; символ из таблицы
+    DEC  ESI
+    MOV  [ESI], DL
+    INC  ECX
+    CMP EAX, 0
+    JNZ  f_hex_loop
+
+f_hex_sign:
+    CMP EBP, 0
+    JZ   f_hex_print
+    DEC  ESI
+    MOV  BYTE PTR [ESI], '-'
+    INC  ECX
+
+f_hex_print:
+    PUSH 0
+    PUSH OFFSET LENS
+    PUSH ECX                  ; длина строки
+    PUSH ESI                  ; адрес первого символа
+    PUSH DOUT
+    CALL WriteConsoleA@20
+
+    ; перевод строки
+    PUSH OFFSET STR_NL
+    CALL lstrlenA@4
+    PUSH 0
+    PUSH OFFSET LENS
+    PUSH EAX
+    PUSH OFFSET STR_NL
+    PUSH DOUT
+    CALL WriteConsoleA@20
+
+
+; ---- подпись для десятичного F(x) ----
+    PUSH OFFSET STR_FDEC
+    CALL lstrlenA@4
+    PUSH 0
+    PUSH OFFSET LENS
+    PUSH EAX
+    PUSH OFFSET STR_FDEC
+    PUSH DOUT
+    CALL WriteConsoleA@20
+
+; ---- конвертация F_VAL -> десятичная строка ----
+    MOV  EAX, F_VAL           ; число для печати 
+    XOR  EBP, EBP             ; 0 = '+', 1 = '-'
+    CMP EAX, 0         
+    JGE  f_dec_abs_ready
+    MOV  EBP, 1               ; отрицательное
+    XOR  EDX, EDX
+    SUB  EDX, EAX             ; |EAX| = 0 - EAX
+    MOV  EAX, EDX
+f_dec_abs_ready:
+
+    LEA  ESI, OUTBUF[63]      ; пишем с конца буфера
+    XOR  ECX, ECX             ; длина строки = 0
+    MOV  EBX, 10
+
+    ; частный случай: 0
+    CMP  EAX, 0
+    JNE  f_dec_loop
+    DEC  ESI
+    MOV  BYTE PTR [ESI], '0'
+    INC  ECX
+    JMP  f_dec_sign
+
+f_dec_loop:
+    XOR  EDX, EDX
+    DIV  EBX                  ; EAX = EAX/10, EDX = остаток
+    ADD  DL, '0'
+    DEC  ESI
+    MOV  [ESI], DL
+    INC  ECX
+    CMP EAX, 0
+    JNZ  f_dec_loop
+
+f_dec_sign:
+    CMP EBP, 0
+    JZ   f_dec_print
+    DEC  ESI
+    MOV  BYTE PTR [ESI], '-'
+    INC  ECX
+
+f_dec_print:
+    ; печатаем ECX байт, начиная с ESI
+    PUSH 0
+    PUSH OFFSET LENS
+    PUSH ECX
+    PUSH ESI
+    PUSH DOUT
+    CALL WriteConsoleA@20
+
+    ; перевод строки
+    PUSH OFFSET STR_NL
+    CALL lstrlenA@4
+    PUSH 0
+    PUSH OFFSET LENS
+    PUSH EAX
+    PUSH OFFSET STR_NL
+    PUSH DOUT
+    CALL WriteConsoleA@20
+
 ; выход
 PUSH 0
 CALL ExitProcess@4
