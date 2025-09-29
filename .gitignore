@@ -1,52 +1,39 @@
-# Prerequisites
-*.d
+# Игнорировать всё по умолчанию
+*
 
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
+# Разрешать папки (чтобы git мог заходить внутрь)
+!*/
 
-# Linker output
-*.ilk
-*.map
-*.exp
+# Разрешать исходники популярных языков
+!*.c
+!*.cpp
+!*.h
+!*.hpp
+!*.py
+!*.java
+!*.cs
+!*.js
+!*.ts
+!*.go
+!*.rs
+!*.php
+!*.rb
 
-# Precompiled Headers
-*.gch
-*.pch
+# Разрешать сборочные скрипты
+!Makefile
+!makefile
+!CMakeLists.txt
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
+# Разрешать ассемблер
+!*.asm
+!*.s
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
+# Разрешать документы
+!*.pdf
+!*.docx
+!*.xlsx
+!*.md
+!*.txt
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
-
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+# Исключить конкретную папку с домашками
+**/homeworks/
